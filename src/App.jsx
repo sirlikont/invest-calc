@@ -8,15 +8,96 @@ export default function App() {
   const [amount, setAmount] = useState(0);
   const [error, setError] = useState("");
 
+  // -------------------------
+  // 1. LISAME CASHFLOW LOOGIKA
+  // -------------------------
+  const toCashflow = (t) => {
+    const amt = Number(t.amount);
+
+    if (t.type === "Algväärtus") return -amt;
+    if (t.type === "Sissemakse") return -amt;
+    if (t.type === "Väljamakse") return amt;
+    if (t.type === "Lõppväärtus") return amt;
+
+    return amt;
+  };
+
+  const cashflows = transactions.map((t) => ({
+    date: new Date(t.date),
+    value: toCashflow(t),
+  }));
+
+  // -------------------------
+  // 2. XIRR FUNKTSIOON
+  // -------------------------
+  function xirr(cashflows, guess = 0.1) {
+    const MAX_ITER = 100;
+    const EPS = 1e-6;
+
+    const days = (d1, d2) =>
+      (d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24);
+
+    const xnpv = (rate) => {
+      const t0 = cashflows[0].date;
+
+      return cashflows.reduce((sum, cf) => {
+        const t = days(cf.date, t0) / 365;
+        return sum + cf.value / Math.pow(1 + rate, t);
+      }, 0);
+    };
+
+    let rate = guess;
+
+    for (let i = 0; i < MAX_ITER; i++) {
+      const t0 = cashflows[0].date;
+
+      let fx = 0;
+      let dfx = 0;
+
+      cashflows.forEach((cf) => {
+        const t = days(cf.date, t0) / 365;
+        const denom = Math.pow(1 + rate, t);
+
+        fx += cf.value / denom;
+        dfx += (-t * cf.value) / ((1 + rate) * denom);
+      });
+
+      const newRate = rate - fx / dfx;
+
+      if (Math.abs(newRate - rate) < EPS) {
+        return newRate;
+      }
+
+      rate = newRate;
+    }
+
+    return rate;
+  }
+
+  const xirrValue =
+    cashflows.length > 1 ? xirr(cashflows) * 100 : 0;
+
+  // -------------------------
+  // 3. S&P 500 (lihtne placeholder)
+  // -------------------------
+  const spReturn = 10; // hiljem API-st
+
+  // -------------------------
+  // TEHINGUD
+  // -------------------------
   const addTransaction = () => {
     if (!date || amount === 0) return;
 
-    if ((type === "Algväärtus" || type === "Lõppväärtus") && transactions.some(t => t.type === type)) {
+    if (
+      (type === "Algväärtus" || type === "Lõppväärtus") &&
+      transactions.some((t) => t.type === type)
+    ) {
       setError(`${type} on juba olemas`);
       return;
     }
 
     setError("");
+
     setTransactions([
       ...transactions,
       {
@@ -40,13 +121,13 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center items-center py-10">
       <div className="bg-white p-6 rounded-xl shadow-md w-[650px] mx-auto">
+
         <h1 className="text-2xl font-bold mb-4">
           Portfelli tootluskalkulaator
         </h1>
 
-        <h2 className="font-semibold mb-2">
-          Lisa rahavoog
-        </h2>
+        {/* INPUT */}
+        <h2 className="font-semibold mb-2">Lisa rahavoog</h2>
 
         <input
           className="border p-2 w-full mb-2"
@@ -82,14 +163,11 @@ export default function App() {
         </button>
 
         {error && (
-          <p className="text-red-500 mb-4">
-            {error}
-          </p>
+          <p className="text-red-500 mb-4">{error}</p>
         )}
 
-        <h2 className="font-semibold mb-2">
-          Rahavood
-        </h2>
+        {/* TEHINGUD */}
+        <h2 className="font-semibold mb-2">Rahavood</h2>
 
         {transactions.length === 0 && (
           <p className="text-gray-500">
@@ -103,7 +181,9 @@ export default function App() {
             className="flex items-center gap-4 border-b py-2 whitespace-nowrap"
           >
             <span>{transaction.date}</span>
-            <span className="text-gray-600">{transaction.type}</span>
+            <span className="text-gray-600">
+              {transaction.type}
+            </span>
             <span className="font-semibold">
               {transaction.amount.toFixed(2)} €
             </span>
@@ -115,6 +195,22 @@ export default function App() {
             </button>
           </div>
         ))}
+
+        {/* TULEMUSED */}
+        <div className="mt-6 p-4 bg-gray-100 rounded">
+          <p className="font-semibold">
+            XIRR tootlus: {xirrValue.toFixed(2)} %
+          </p>
+
+          <p>
+            S&P 500 (ligikaudne): {spReturn.toFixed(2)} %
+          </p>
+
+          <p className="font-semibold mt-1">
+            Vahe: {(xirrValue - spReturn).toFixed(2)} %
+          </p>
+        </div>
+
       </div>
     </div>
   );
