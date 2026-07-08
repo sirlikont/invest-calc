@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function App() {
   const [transactions, setTransactions] = useState([]);
@@ -7,9 +7,12 @@ export default function App() {
   const [type, setType] = useState("Sissemakse");
   const [amount, setAmount] = useState(0);
   const [error, setError] = useState("");
+  const [sxr8Prices, setSxr8Prices] = useState([]);
+  const [loadingSxr8, setLoadingSxr8] = useState(false);
+  const [sxr8Error, setSxr8Error] = useState("");
 
   // -------------------------
-  // 1. LISAME CASHFLOW LOOGIKA
+  // 1. CASHFLOW LOOGIKA
   // -------------------------
   const toCashflow = (t) => {
     const amt = Number(t.amount);
@@ -38,15 +41,6 @@ export default function App() {
 
     const days = (d1, d2) =>
       (d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24);
-
-    const xnpv = (rate) => {
-      const t0 = cashflows[0].date;
-
-      return cashflows.reduce((sum, cf) => {
-        const t = days(cf.date, t0) / 365;
-        return sum + cf.value / Math.pow(1 + rate, t);
-      }, 0);
-    };
 
     let rate = guess;
 
@@ -79,7 +73,6 @@ export default function App() {
   const xirrValue =
     cashflows.length > 1 ? xirr(cashflows) * 100 : 0;
 
-  // Kaitse absurdsete väärtuste eest
   const safeXirrValue = Math.abs(xirrValue) > 10000 ? 0 : xirrValue;
 
   // -------------------------
@@ -116,13 +109,170 @@ export default function App() {
       : 0;
 
   // -------------------------
-  // 4. S&P 500 (lihtne placeholder)
+  // 4. SXR8 API FUNKTSIOONID
   // -------------------------
-  const spReturn = 10; // hiljem API-st
+  async function getSxr8History(startDate, endDate) {
+    const start = Math.floor(new Date(startDate).getTime() / 1000);
+    const end = Math.floor(new Date(endDate).getTime() / 1000) + (24 * 60 * 60);
 
-  // -------------------------
-  // TEHINGUD
-  // -------------------------
+    const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/SXR8.DE?period1=${start}&period2=${end}&interval=1d`;
+
+    const proxies = [
+      `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+      `https://cors-anywhere.herokuapp.com/${targetUrl}`,
+      targetUrl
+    ];
+
+    for (const url of proxies) {
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        });
+        const json = await response.json();
+
+        if (json.chart && json.chart.result && json.chart.result.length > 0) {
+          const result = json.chart.result[0];
+          const prices = result.indicators.quote[0];
+          const priceData = prices.adjclose || prices.close;
+          return result.timestamp.map((time, index) => ({
+            date: new Date(time * 1000),
+            price: priceData[index]
+          }));
+        }
+      } catch {
+        console.log(`Failed with ${url}, trying next option...`);
+        continue;
+      }
+    }
+
+    console.error("All proxy options failed");
+    return [];
+  }
+
+  function getClosestPrice(prices, date) {
+    const target = new Date(date);
+    target.setHours(0, 0, 0, 0);
+
+    return prices
+      .filter(p => {
+        const priceDate = new Date(p.date);
+        priceDate.setHours(0, 0, 0, 0);
+        return priceDate >= target;
+      })
+      .sort((a, b) => a.date - b.date)[0];
+  }
+
+  function getLastPriceBeforeDate(prices, date) {
+    const target = new Date(date);
+    target.setHours(23, 59, 59, 999);
+
+    return prices
+      .filter(p => {
+        const priceDate = new Date(p.date);
+        priceDate.setHours(0, 0, 0, 0);
+        return priceDate <= target;
+      })
+      .sort((a, b) => b.date - a.date)[0];
+  }
+
+  function calculateSxr8Shares(transactions, prices) {
+    let shares = 0;
+
+    transactions.forEach(t => {
+      if (t.type === "Algväärtus" || t.type === "Sissemakse") {
+        const price = getClosestPrice(prices, t.date);
+
+        console.log(
+          t.date,
+          t.type,
+          "raha:",
+          t.amount,
+          "SXR8 hind:",
+          price?.price
+        );
+
+        if (price) {
+          shares += Number(t.amount) / price.price;
+        }
+      }
+    });
+
+    console.log("KOKKU OSAKUID:", shares);
+
+    return shares;
+  }
+
+  function getSxr8Value(shares, prices, endDate) {
+    const lastPrice = getLastPriceBeforeDate(prices, endDate);
+
+    if (!lastPrice) return 0;
+
+    return shares * lastPrice.price;
+  }
+
+  useEffect(() => {
+    const fetchSxr8Data = async () => {
+      if (!startDate || !endDate) return;
+
+      const now = new Date();
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+
+      if (start > now || end > now) {
+        setSxr8Error("Cannot fetch SXR8 data for future dates");
+        setSxr8Prices([]);
+        return;
+      }
+
+      setLoadingSxr8(true);
+      setSxr8Error("");
+
+      const prices = await getSxr8History(startDate, endDate);
+
+      console.log("SXR8 hinnad:");
+      console.log(prices);
+      console.log("Esimene hind:", prices[0]);
+      console.log("Viimane hind:", prices[prices.length - 1]);
+
+      setLoadingSxr8(false);
+
+      if (prices.length === 0) {
+        setSxr8Error("Failed to fetch SXR8 data - API may be blocked by CORS. Try using past dates (e.g., 2024-01-01 to 2024-07-01) to test.");
+      }
+
+      setSxr8Prices(prices);
+    };
+
+    fetchSxr8Data();
+  }, [startDate, endDate]);
+
+  const sortedTransactions = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const sxr8Shares = sxr8Prices.length > 0 ? calculateSxr8Shares(sortedTransactions, sxr8Prices) : 0;
+  const sxr8Value = sxr8Prices.length > 0 ? getSxr8Value(sxr8Shares, sxr8Prices, endDate) : 0;
+
+  console.log("SXR8 osakud:", sxr8Shares);
+  console.log("SXR8 lõppväärtus:", sxr8Value);
+
+  const sxr8Cashflows = transactions
+    .map(t => ({
+      date: new Date(t.date),
+      value: (t.type === "Algväärtus" || t.type === "Sissemakse") ? -t.amount : 0
+    }))
+    .sort((a, b) => a.date - b.date);
+
+  if (endDate && sxr8Value > 0) {
+    sxr8Cashflows.push({
+      date: new Date(endDate),
+      value: sxr8Value
+    });
+  }
+
+  const sxr8Xirr = sxr8Cashflows.length > 1 ? xirr(sxr8Cashflows) * 100 : 0;
+  const safeSxr8Xirr = Math.abs(sxr8Xirr) > 10000 ? 0 : sxr8Xirr;
+
   const addTransaction = () => {
     if (!date || amount === 0) return;
 
@@ -164,8 +314,9 @@ export default function App() {
           Portfelli tootluskalkulaator
         </h1>
 
-        {/* INPUT */}
-        <h2 className="font-semibold mb-2">Lisa rahavoog</h2>
+        <h2 className="font-semibold mb-2">
+          Lisa rahavoog
+        </h2>
 
         <input
           className="border p-2 w-full mb-2"
@@ -204,8 +355,9 @@ export default function App() {
           <p className="text-red-500 mb-4">{error}</p>
         )}
 
-        {/* TEHINGUD */}
-        <h2 className="font-semibold mb-2">Rahavood</h2>
+        <h2 className="font-semibold mb-2">
+          Rahavood
+        </h2>
 
         {transactions.length === 0 && (
           <p className="text-gray-500">
@@ -216,21 +368,24 @@ export default function App() {
         {transactions.map((transaction, index) => (
           <div
             key={index}
-            className="flex items-center gap-4 border-b py-2 whitespace-nowrap"
+            className="flex justify-between items-center border-b py-2 leading-none whitespace-nowrap"
           >
             <span>{transaction.date}</span>
-            <span className="text-gray-600">
-              {transaction.type}
-            </span>
-            <span className="font-semibold">
-              {transaction.amount.toFixed(2)} €
-            </span>
-            <button
-              onClick={() => deleteTransaction(index)}
-              className="text-red-500 hover:text-red-700"
-            >
-              ❌
-            </button>
+
+            <span className="text-gray-600">{transaction.type}</span>
+
+            <div className="flex items-center gap-3">
+              <span className="font-semibold">
+                {transaction.amount.toFixed(2)} €
+              </span>
+
+              <button
+                onClick={() => deleteTransaction(index)}
+                className="text-red-500 hover:text-red-700"
+              >
+                ❌
+              </button>
+            </div>
           </div>
         ))}
 
@@ -243,18 +398,25 @@ export default function App() {
 
         <div className="mt-6 p-4 bg-gray-100 rounded">
           <p className="font-semibold">
-            XIRR tootlus: {safeXirrValue.toFixed(2)} %
+            Minu portfelli XIRR: {safeXirrValue.toFixed(2)} %
           </p>
 
-          <p>
-            S&P 500 (ligikaudne): {spReturn.toFixed(2)} %
-          </p>
+          {loadingSxr8 ? (
+            <p>Laadin SXR8 andmeid...</p>
+          ) : sxr8Error ? (
+            <p className="text-red-500">{sxr8Error}</p>
+          ) : (
+            <>
+              <p>
+                SXR8 XIRR samade sissemaksete korral: {safeSxr8Xirr.toFixed(2)} %
+              </p>
 
-          <p className="font-semibold mt-1">
-            Vahe: {(safeXirrValue - spReturn).toFixed(2)} %
-          </p>
+              <p className="font-semibold mt-1">
+                Vahe: {(safeXirrValue - safeSxr8Xirr).toFixed(2)} %
+              </p>
+            </>
+          )}
         </div>
-
       </div>
     </div>
   );
