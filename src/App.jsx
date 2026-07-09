@@ -8,7 +8,7 @@ export default function App() {
 
   const [date, setDate] = useState("");
   const [type, setType] = useState("Sissemakse");
-  const [amount, setAmount] = useState(0);
+  const [amount, setAmount] = useState("");
   const [error, setError] = useState("");
   const [sxr8Prices, setSxr8Prices] = useState([]);
   const [loadingSxr8, setLoadingSxr8] = useState(false);
@@ -297,7 +297,7 @@ export default function App() {
   const safeSxr8Xirr = Math.abs(sxr8Xirr) > 10000 ? 0 : sxr8Xirr;
 
   const addTransaction = () => {
-    if (!date || amount === 0) return;
+    if (!date || Number(amount) <= 0) return;
 
     if (
       (type === "Algväärtus" || type === "Lõppväärtus") &&
@@ -319,7 +319,7 @@ export default function App() {
     ]);
 
     setDate("");
-    setAmount(0);
+    setAmount("");
     setType("Sissemakse");
   };
 
