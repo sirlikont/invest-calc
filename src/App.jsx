@@ -11,6 +11,16 @@ export default function App() {
   const [loadingSxr8, setLoadingSxr8] = useState(false);
   const [sxr8Error, setSxr8Error] = useState("");
 
+  // Format date to dd.mm.yyyy
+  const formatDate = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}.${month}.${year}`;
+  };
+
   // -------------------------
   // 1. CASHFLOW LOOGIKA
   // -------------------------
@@ -107,6 +117,11 @@ export default function App() {
     invested > 0
       ? (profit / invested) * 100
       : 0;
+
+  // Filter transactions to only include those within the period (startDate onwards)
+  const validTransactions = startDate
+    ? transactions.filter(t => new Date(t.date) >= new Date(startDate))
+    : transactions;
 
   // -------------------------
   // 4. SXR8 API FUNKTSIOONID
@@ -249,14 +264,14 @@ export default function App() {
     fetchSxr8Data();
   }, [startDate, endDate]);
 
-  const sortedTransactions = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const sortedTransactions = [...validTransactions].sort((a, b) => new Date(a.date) - new Date(b.date));
   const sxr8Shares = sxr8Prices.length > 0 ? calculateSxr8Shares(sortedTransactions, sxr8Prices) : 0;
   const sxr8Value = sxr8Prices.length > 0 ? getSxr8Value(sxr8Shares, sxr8Prices, endDate) : 0;
 
   console.log("SXR8 osakud:", sxr8Shares);
   console.log("SXR8 lõppväärtus:", sxr8Value);
 
-  const sxr8Cashflows = transactions
+  const sxr8Cashflows = validTransactions
     .map(t => ({
       date: new Date(t.date),
       value: (t.type === "Algväärtus" || t.type === "Sissemakse") ? -t.amount : 0
@@ -356,7 +371,7 @@ export default function App() {
         )}
 
         <h2 className="font-semibold mb-2">
-          Rahavood
+          Minu portfell:
         </h2>
 
         {transactions.length === 0 && (
@@ -368,30 +383,27 @@ export default function App() {
         {transactions.map((transaction, index) => (
           <div
             key={index}
-            className="flex justify-between items-center border-b py-2 leading-none whitespace-nowrap"
+            className="flex items-center gap-4 border-b py-2 whitespace-nowrap"
           >
-            <span>{transaction.date}</span>
-
-            <span className="text-gray-600">{transaction.type}</span>
-
-            <div className="flex items-center gap-3">
-              <span className="font-semibold">
-                {transaction.amount.toFixed(2)} €
-              </span>
-
-              <button
-                onClick={() => deleteTransaction(index)}
-                className="text-red-500 hover:text-red-700"
-              >
-                ❌
-              </button>
-            </div>
+            <span>{formatDate(transaction.date)}</span>
+            <span className="text-gray-600">
+              {transaction.type}
+            </span>
+            <span className="font-semibold">
+              {transaction.amount.toFixed(2)} €
+            </span>
+            <button
+              onClick={() => deleteTransaction(index)}
+              className="text-red-500 hover:text-red-700"
+            >
+              ❌
+            </button>
           </div>
         ))}
 
         {/* TULEMUSED */}
         <div className="mb-6 whitespace-nowrap">
-          <span className="font-semibold text-sm">Periood: {startDate || "—"} – {endDate || "—"} | </span>
+          <span className="font-semibold text-sm">Periood: {formatDate(startDate) || "—"} – {formatDate(endDate) || "—"} | </span>
           <span className="font-semibold text-sm">Kasum: {profit.toFixed(2)} € | </span>
           <span className="font-semibold text-sm">Lihttootlus: {totalReturn.toFixed(2)} %</span>
         </div>
@@ -407,13 +419,26 @@ export default function App() {
             <p className="text-red-500">{sxr8Error}</p>
           ) : (
             <>
-              <p>
-                SXR8 XIRR samade sissemaksete korral: {safeSxr8Xirr.toFixed(2)} %
+              <p title="Võrdlusindeksina kasutatakse eurodes noteeritud SXR8 ETF-i, et välistada euro ja USA dollari vahetuskursi muutustest tulenev valuutarisk. See võimaldab hinnata portfelli tootlust võrreldes S&P 500 indeksiga võimalikult objektiivselt, kuna tootluste erinevus ei ole mõjutatud valuutakõikumistest.">
+                S&P500 XIRR tootlus samade sissemaksete korral: {safeSxr8Xirr.toFixed(2)} %
               </p>
 
               <p className="font-semibold mt-1">
                 Vahe: {(safeXirrValue - safeSxr8Xirr).toFixed(2)} %
               </p>
+
+              {safeXirrValue > safeSxr8Xirr && (
+                <h2 className="font-semibold mb-2">
+                  Sinu portfell edestas S&P500
+                </h2>
+              )}
+
+              {safeXirrValue < safeSxr8Xirr && (
+                <h2 className="font-semibold mb-2">
+                  Praegu on S&P 500 indeks sinu portfelli edestanud. Kui oleksid investeerinud samad summad SXR8 ETF-i, oleks sinu portfelli väärtus täna umbes {(sxr8Value - (end?.amount || 0)).toFixed(2)} € suurem. See on hea võimalus analüüsida, kas sinu investeerimisstrateegia loob pikaajaliselt indeksiga võrreldes lisaväärtust.
+                </h2>
+              )}
+
             </>
           )}
         </div>
