@@ -1,16 +1,82 @@
-# React + Vite
+# 📈 Invest Calc
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A simple investment portfolio calculator that helps compare your personal portfolio performance against the S&P 500 index using the euro-denominated SXR8 ETF.
 
-Currently, two official plugins are available:
+## 🚀 About the project
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Invest Calc allows users to:
 
-## React Compiler
+- add portfolio transactions (deposits and portfolio value changes)
+- calculate portfolio return using XIRR
+- compare results against SXR8 ETF performance
+- see whether active investing has outperformed a passive index strategy
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The goal of the project is to make investment performance comparison easier and more understandable.
 
-## Expanding the ESLint configuration
+## ✨ Features
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+✅ Portfolio transaction tracking  
+✅ XIRR return calculation  
+✅ SXR8 ETF benchmark comparison  
+✅ Automatic profit/loss calculation  
+✅ Local browser storage (no account required)  
+✅ Responsive design
+
+## 🧮 Why SXR8 comparison?
+
+The portfolio is compared with SXR8 instead of a USD-based S&P 500 ETF because SXR8 is traded in euros.
+
+This removes the effect of EUR/USD exchange rate changes and provides a more accurate comparison for an investor whose portfolio is also measured in euros.
+
+## 💾 Data storage
+
+The application uses browser `localStorage`.
+
+This means:
+- no registration is required
+- data stays on the user's device
+- no external database is needed
+
+## 🛠️ Technologies
+
+Built with:
+
+- React
+- Vite
+- JavaScript
+- CSS
+
+## 📦 Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/sirlikont/invest-calc.git
+```
+
+Install dependencies:
+```bash
+npm install
+```
+
+Run development server:
+```bash
+npm run dev
+```
+
+Build production version:
+```bash
+npm run build
+```
+🌐 Live demo
+
+Coming soon...
+
+
+
+📄 License
+
+This project is for educational purposes.
+
+Author: Sirli Kont
+Contact: sirli.kont@gmail.com

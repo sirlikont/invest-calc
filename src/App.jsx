@@ -330,8 +330,10 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center items-center py-10">
-      <div className="bg-white p-6 rounded-xl shadow-md w-[900px] mx-auto">
+    <div className="app">
+
+      <main className="flex-1 py-10">
+        <div className="bg-white p-6 rounded-xl shadow-md w-[900px] mx-auto">
 
         <h1 className="text-2xl font-bold mb-4">
           Portfelli tootluskalkulaator
@@ -451,6 +453,12 @@ export default function App() {
           )}
         </div>
       </div>
+      </main>
+
+      <footer className="text-center text-sm text-gray-500 py-4">
+      <p>© Sirli Kont {new Date().getFullYear()}</p>
+      <a href="mailto:sirlikont@gmail.com">sirlikont@gmail.com</a>
+      </footer>
     </div>
   );
 }
