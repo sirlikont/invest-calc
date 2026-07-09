@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 
 export default function App() {
-  const [transactions, setTransactions] = useState([]);
+  const [transactions, setTransactions] = useState(() => {
+    const saved = localStorage.getItem('transactions');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const [date, setDate] = useState("");
   const [type, setType] = useState("Sissemakse");
@@ -20,6 +23,11 @@ export default function App() {
     const year = date.getFullYear();
     return `${day}.${month}.${year}`;
   };
+
+  // Save transactions to localStorage
+  useEffect(() => {
+    localStorage.setItem('transactions', JSON.stringify(transactions));
+  }, [transactions]);
 
   // -------------------------
   // 1. CASHFLOW LOOGIKA
